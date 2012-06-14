@@ -1,3 +1,86 @@
-= Billing
+What is a Rails Engine?
+  Engine are miniature Rails applications that you embed into your main application.
+  You can share an Engine across different applications.
+  Since Rails 3.0, every Rails application is nothing more than an Engine, allowing you to share it very easily.
 
-This project rocks and uses MIT-LICENSE.
+In Rails 3.1 and higher version provides the ability to create a plugin as engine using a single command.
+
+1. Creating engine
+
+      rails plugin new billing --mountable
+
+   It creates a billing folder in the main app.
+   I will move this folder into lib folder  or you can keep it there only.
+
+2. Gem file
+   This billing module will function as gem in application. In order to function as gem we need  to define this gem in gem file as
+
+      gem 'billing', :path => 'lib/billing'
+
+    Write this code in gem file in path option specify the path while this gem is stored in your application.
+   After writing this run bundle install command
+
+3. Mounting engine
+    Next important thing is billing/config/routes.rb file:
+
+      Billing::Engine.routes.draw do
+      end
+
+   These are empty routes, but as you can see, they belong to the engine, not to the host application.
+
+   Since engine is now a rack app, you can simply mount it in your application’s routes:
+
+      Rails.application.routes.draw do
+        mount Billing::Engine => "/billing"
+      end
+
+   This will mount Billing::Engine at /billing path.
+
+4. Isolated Engine
+   Normally when you create controllers, helpers and models inside an engine, they are treated as if they were created inside the application itself. This means that all helpers and named routes from the application will be available to your engine’s controllers as well.
+   However, sometimes you want to isolate your engine from the application, especially if your engine has its own router. To do that, you simply need to call isolate_namespace. This method requires you to pass a module where all your controllers, helpers and models should be nested to:
+
+      module Billing
+        class Engine < Rails::Engine
+          isolate_namespace Billing
+        end
+      end
+
+   With such an engine, everything that is inside the MyEngine module will be isolated from the application.
+
+   Write this code inside billing/lib/billing/engine.rb file
+   Using isolated engines  the behavior of routes changes. Normally, when you namespace your controllers, you also need to do namespace all your routes. With an isolated engine, the namespace is applied by default, so you can ignore it in routes:
+
+      Billing::Engine.routes.draw do
+        resources :invoices
+      end
+
+   The routes above will automatically point Biliing::InvoicesController. Furthermore, you don’t need to use longer url helpers like billing_invoices_path. Instead, you should simply use invoices_path as you would do with your application.
+
+5. Migrations
+  Engines can have their own migrations. The default path for migrations is exactly the same as in application: db/migrate.
+
+   To create a migration for engine you have go to that path where engine is located
+
+eg:- cd /lib/billing
+ Now generate the migration for invoices.
+   Notice that migration for that is called create_billing_invoices instead of create_invoices. Also almost all of the files are places in billing/ subdirectory. When you open app/models/billing/invoice.rb, you will see:
+
+      module Billing
+        class Invoice < ActiveRecord::Base
+        end
+      end
+
+   Everything is namespaced for a good reason.We want to avoid conflicts between engine and host application.
+   When you run rake db:migrate this migration will not be created. In order to create this migration you have to copy this migration into main app using command
+
+      rake Billing:install:migrations
+      rake db:migrate
+
+6. Cross application routes
+
+   In order to use engines routes in main app
+      billing.invoices_path
+
+   In order to use application routes in engine
+      main_app.sign_out_path
